@@ -290,3 +290,35 @@ table.rail-t td.bad { color: var(--down); font-weight: 600; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .masthead { flex-direction: column; align-items: flex-start; }
 }
+/* v21: the whole story fits one 1024px viewport — every section visible at once */
+#board { max-width: 1024px; padding: 6px 8px 12px; }
+.masthead { padding-bottom: 4px; gap: 6px; }
+.masthead-left small { max-width: 600px; font-size: 10px; }
+.wordmark { font-size: 13px; }
+.glyph { width: 16px; height: 16px; }
+.kpis { gap: 4px; margin: 4px 0; }
+.kpis > div { padding: 4px 6px; }
+.kpis b { font-size: 11px; }
+.kpis span { font-size: 8px; }
+.kpis small { font-size: 7px; }
+.panel { padding: 6px 8px; margin-bottom: 6px; }
+.panel h2 { font-size: 11px; margin-bottom: 3px; }
+.panel h3 { font-size: 9px; margin: 4px 0 2px; }
+table { font-size: 9px; }
+table th, table td { padding: 1px 3px; }
+.caption { font-size: 8px; padding: 2px 0; }
+.scroll { max-height: none; }
+.split { grid-template-columns: minmax(0,1fr) 290px; gap: 6px; }
+.col-rail { position: static; }
+.rail-panel { padding: 6px; }
+.rail-grid { gap: 3px; margin: 3px 0; }
+.rail-grid .cell { padding: 2px 4px; }
+.rail-grid .cell b { font-size: 10px; }
+.rail-grid .cell span { font-size: 7px; }
+table.rail-t { font-size: 8px; margin: 2px 0; }
+table.rail-t th, table.rail-t td { padding: 0 3px; }
+.basket-panel { padding: 6px; margin-top: 6px; }
+.basket-panel table { font-size: 9px; }
+.basket-panel th, .basket-panel td { padding: 1px 5px; }
+/* the board is the long tail: cap the visible rows so the page fits */
+tbody tr:nth-child(n+60) { display: none; }

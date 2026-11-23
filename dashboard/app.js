@@ -35,6 +35,8 @@
     return `${Math.round(v)} d`;
   }
   function num2(v) { return (Math.round(v * 100) / 100).toFixed(2); }
+  function nph(v) { return (v && Number.isFinite(v.net_usd) && Number.isFinite(v.hours) && v.hours > 0) ? v.net_usd / v.hours : null; }
+
 
   function make(tag, attrs, kids) {
     const node = document.createElement(tag);
@@ -118,7 +120,7 @@
       else if (k === 'age_days') { av = a.age_days === null ? Infinity : a.age_days; bv = b.age_days === null ? Infinity : b.age_days; }
       else if (k === 'token_odds') { av = a.token_odds; bv = b.token_odds; }
       else if (k === 'net_usd') { av = a.verdict.net_usd; bv = b.verdict.net_usd; }
-      else if (k === 'rate') { av = a.verdict.net_per_hour_usd; bv = b.verdict.net_per_hour_usd; }
+      else if (k === 'rate') { av = nph(a.verdict); bv = nph(b.verdict); }
       else { av = a.implied_value_usd; bv = b.implied_value_usd; }
       if (av < bv) return -d;
       if (av > bv) return d;
@@ -171,7 +173,7 @@ function masthead() {
     const farmKeep = keepRows.length;
     const farmMarginal = doc.rows.filter((r) => r.verdict.verdict === 'marginal').length;
     const farmPass = doc.rows.filter((r) => r.verdict.verdict === 'pass').length;
-    const rates = keepRows.map((r) => r.verdict.net_per_hour_usd).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+    const rates = keepRows.map((r) => nph(r.verdict)).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
     const medianRate = rates.length === 0 ? 0 : rates[Math.floor(rates.length / 2)];
     const items = [
       { k: 'protocols scanned', v: String(s.protocols), sub: `${s.live} live token · ${s.excluded_cexs} CEX set aside` },
@@ -271,7 +273,7 @@ function masthead() {
       const lines = [head.join(',')];
       for (const r of list) {
         const v = r.verdict || {};
-        lines.push([r.rank, `"${(r.name || '').replace(/"/g, '""')}"`, r.category || 'Other', `"${(r.chains || []).join(' ')}"`, r.tvl_usd, r.change_7d ?? '', r.age_days ?? '', r.implied_value_usd, r.token_odds ?? '', v.verdict || '', v.deposit_usd ?? '', v.net_usd ?? '', v.net_per_hour_usd ?? '', v.hours ?? ''].join(','));
+        lines.push([r.rank, `"${(r.name || '').replace(/"/g, '""')}"`, r.category || 'Other', `"${(r.chains || []).join(' ')}"`, r.tvl_usd, r.change_7d ?? '', r.age_days ?? '', r.implied_value_usd, r.token_odds ?? '', v.verdict || '', v.deposit_usd ?? '', v.net_usd ?? '', (nph(v) ?? '').toString(), v.hours ?? ''].join(','));
       }
       blob = new Blob([lines.join('\n')], { type: 'text/csv' });
       name = 'radar-board.csv';
@@ -337,7 +339,7 @@ function masthead() {
         make('td', { class: 'odds', text: `${Math.round(row.token_odds * 100)}%` }),
         make('td', null, [verdictPill(row.verdict)]),
         make('td', { class: `num ${row.verdict.net_usd >= 0 ? 'up' : 'down'}`, text: `${row.verdict.net_usd >= 0 ? '+' : '−'}${money(Math.abs(row.verdict.net_usd))}` }),
-        make('td', { class: `num ${row.verdict.net_per_hour_usd >= 15 ? 'up' : 'down'}`, text: `${row.verdict.net_per_hour_usd >= 0 ? '+' : '−'}$${Math.abs(row.verdict.net_per_hour_usd).toFixed(0)}` }),
+        make('td', { class: `num ${nph(row.verdict) >= 15 ? 'up' : 'down'}`, text: `${nph(row.verdict) >= 0 ? '+' : '−'}$${Math.abs(nph(row.verdict)).toFixed(0)}` }),
         make('td', { class: 'tag', text: 'pre-token' })
       ]);
       tr.addEventListener('click', () => openDrawer(row.slug));
@@ -461,7 +463,7 @@ function masthead() {
   /* ---- basket builder: greedy by expected net per hour, fitted to capital
      and hours, so the reader sees the whole board turned into one plan. */
   function basket() {
-    const rows = doc.rows.slice().sort((a, b) => b.verdict.net_per_hour_usd - a.verdict.net_per_hour_usd);
+    const rows = doc.rows.slice().sort((a, b) => nph(b.verdict) - nph(a.verdict));
     let budget = 25000, hrs = 5;
     const picks = [];
     for (const r of rows) {
@@ -470,7 +472,7 @@ function masthead() {
       if (v.net_usd <= 0) continue;
       const plan = Math.max(250, Math.round(r.tvl_usd * 0.0002));
       if (plan > budget) continue;
-      picks.push({ r, plan, net: v.net_usd, perHour: v.net_per_hour_usd });
+      picks.push({ r, plan, net: v.net_usd, perHour: nph(v) });
       budget -= plan;
       if (budget < 250) break;
     }
@@ -486,7 +488,7 @@ function masthead() {
             make('td', { text: x.r.name }),
             make('td', { class: 'num', text: money(x.plan) }),
             make('td', { class: 'num', text: money(x.net) }),
-            make('td', { class: 'num', text: `$${x.perHour.toFixed(0)}` }),
+            make('td', { class: 'num', text: `$${nph(x.r.verdict).toFixed(0)}` }),
             make('td', null, [verdictPill(x.r.verdict)])
           ])))
         ])
@@ -553,7 +555,7 @@ function masthead() {
         make('div', { class: 'row' }, [make('span', { text: 'modelled drop share' }), make('span', { text: `${v.drop_share_pct}%` })]),
         make('div', { class: 'row' }, [make('span', { text: 'est. value' }), make('span', { text: moneyFull(v.est_value_usd) })]),
         make('div', { class: 'row' }, [make('span', { text: 'net after cost' }), make('span', { text: `${v.net_usd >= 0 ? '+' : ''}${moneyFull(v.net_usd)}` })]),
-        make('div', { class: 'row' }, [make('span', { text: 'net per hour' }), make('span', { text: `${v.net_per_hour_usd >= 0 ? '+' : ''}$${v.net_per_hour_usd.toFixed(0)}/h` })]),
+        make('div', { class: 'row' }, [make('span', { text: 'net per hour' }), make('span', { text: `${nph(v) >= 0 ? '+' : ''}$${nph(v).toFixed(0)}/h` })]),
         make('div', { class: 'row' }, [make('span', { text: 'time' }), make('span', { text: `~${v.hours} h over ${v.horizon_weeks} wk` })])
       ]),
       make('h3', { text: 'farm plan' }),
