@@ -255,6 +255,34 @@ table.mini th { color: var(--dim); text-transform: uppercase; letter-spacing: 0.
 .peers th, .peers td { border-top: 1px dashed var(--line); padding: 2px 5px; font-family: var(--mono); font-size: 10px; }
 .peers td.num { text-align: right; }
 
+/* split layout: board left, evidence rail right */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 14px; align-items: start; }
+.col-rail { position: sticky; top: 8px; }
+.rail-panel { padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.rail-panel h2 { margin: 0 0 4px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
+.rail-panel h3 { margin: 10px 0 4px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
+.rail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin: 6px 0; }
+.rail-grid .cell { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; }
+.rail-grid .cell b { display: block; font-family: var(--mono); font-size: 14px; color: var(--accent); }
+.rail-grid .cell span { font-size: 10px; color: var(--dim); }
+table.rail-t { width: 100%; border-collapse: collapse; font-size: 11px; margin: 6px 0; }
+table.rail-t th, table.rail-t td { padding: 3px 6px; border-top: 1px solid var(--line); text-align: left; }
+table.rail-t th { color: var(--dim); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+table.rail-t td.num, table.rail-t th.num { text-align: right; font-family: var(--mono); }
+table.rail-t td.ok { color: var(--up); font-weight: 600; }
+table.rail-t td.bad { color: var(--down); font-weight: 600; }
+.basket-panel { padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 14px; }
+.basket-panel h2 { margin: 0 0 4px; font-size: 13px; }
+.basket-panel .method { margin: 0 0 8px; }
+.basket-panel table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.basket-panel th, .basket-panel td { text-align: left; padding: 6px 9px; border-top: 1px solid var(--line); }
+.basket-panel th { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+@media (max-width: 1100px) {
+  .split { grid-template-columns: 1fr; }
+  .col-rail { position: static; }
+}
+
 @media (max-width: 1000px) {
   .kpis { grid-template-columns: repeat(3, 1fr); }
 }

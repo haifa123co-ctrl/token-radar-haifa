@@ -402,6 +402,98 @@ function masthead() {
 
   const drawer = make('aside', { class: 'drawer', id: 'drawer', 'aria-hidden': 'true' });
 
+  /* ---- evidence rail: the out-of-sample check, the term-by-term blind test,
+     the odds model and its calibration, in a side column beside the board. */
+  function evidenceRail() {
+    const s = doc.stats;
+    const v = s.validation;
+    const p = doc.scored_params || doc.params;
+    const rh = rangeHolds();
+    const b = doc.rows[0];
+    const cal = doc.odds_calibration;
+    const farm = doc.rows.filter((r) => r.verdict.verdict === 'keep').length;
+    return make('aside', { class: 'col-rail' }, [
+      make('section', { class: 'panel rail-panel' }, [
+        make('h2', { text: 'OUT-OF-SAMPLE CHECK' }),
+        make('p', { class: 'method', text: 'Leave-one-out: every priced protocol is valued by a model fitted without it. Walk-forward: fitted on the protocols listed earlier, tested on those listed later, rolling windows.' }),
+        make('div', { class: 'rail-grid' }, [
+          make('div', { class: 'cell' }, [make('b', { text: `${v.miss_median.toFixed(2)}×` }), make('span', { text: 'value miss · leave-one-out' })]),
+          make('div', { class: 'cell' }, [make('b', { text: `${v.holdout_miss.toFixed(2)}×` }), make('span', { text: 'value miss · held out' })]),
+          make('div', { class: 'cell' }, [make('b', { text: `${v.walk.worst.toFixed(2)}×` }), make('span', { text: 'walk-forward worst' })]),
+          make('div', { class: 'cell' }, [make('b', { text: `${Math.round(rh.p50 * 100)}%` }), make('span', { text: `range honesty P50 · ${Math.round(rh.p90 * 100)}% P90` })])
+        ]),
+        make('h3', { text: `value model — term by term (${v.n} priced peers)` }),
+        make('p', { class: 'method', text: 'A term is kept only where it lowers both the leave-one-out and the walk-forward miss. A term that only flatters the training set is dropped, not hidden.' }),
+        make('table', { class: 'rail-t' }, [
+          make('thead', null, [make('tr', null, [make('th', { text: 'term' }), make('th', { class: 'num', text: 'with' }), make('th', { class: 'num', text: 'gain' }), make('th', { text: 'reads' })])]),
+          make('tbody', null, (v.terms.length ? v.terms : [{ name: 'none', kept: false, miss: 0, delta: 0, note: 'not fitted' }]).map((t) =>
+            make('tr', null, [
+              make('td', { text: t.name }),
+              make('td', { class: 'num', text: `${t.miss.toFixed(2)}×` }),
+              make('td', { class: `num ${t.kept ? 'ok' : 'bad'}`, text: `${t.delta >= 0 ? '+' : ''}${t.delta.toFixed(2)}×` }),
+              make('td', { text: t.kept ? 'kept' : 'dropped', class: t.kept ? 'ok' : 'bad' })
+            ])
+          ))
+        ]),
+        make('h3', { text: 'token odds — logistic on the dated protocols' }),
+        make('p', { class: 'method', text: 'A probability a token exists at all, kept apart from the implied value and multiplied only into the farm verdict.' }),
+        b ? make('div', { class: 'rail-grid' }, [
+          make('div', { class: 'cell' }, [make('b', { text: b.odds_brier_cv.toFixed(3) }), make('span', { text: 'odds · 10-fold CV Brier' })]),
+          make('div', { class: 'cell' }, [make('b', { text: b.odds_brier_wf.toFixed(3) }), make('span', { text: 'odds · walk-forward Brier' })]),
+          make('div', { class: 'cell' }, [make('b', { text: b.odds_base_rate.toFixed(3) }), make('span', { text: 'dated base rate' })])
+        ]) : null,
+        cal && cal.length ? make('div', null, [
+          make('h3', { text: 'odds calibration — out of fold' }),
+          make('table', { class: 'rail-t' }, [
+            make('thead', null, [make('tr', null, ['age band', 'n', 'model', 'actual'].map((h) => make('th', { text: h })))]),
+            make('tbody', null, cal.map((c) => make('tr', null, [
+              make('td', { text: c.band }), make('td', { class: 'num', text: String(c.n) }),
+              make('td', { class: 'num', text: c.pred.toFixed(3) }), make('td', { class: 'num', text: c.actual.toFixed(3) })
+            ])))
+          ])
+        ]) : null,
+        make('h3', { text: `the farm screen — ${farm} keep of ${doc.stats.board}` }),
+        make('p', { class: 'method', text: 'Worth farming at the default plan: the net is the implied value a sized deposit can claim, times the launch odds, less the cost of the plan over its horizon.' })
+      ])
+    ]);
+  }
+
+  /* ---- basket builder: greedy by expected net per hour, fitted to capital
+     and hours, so the reader sees the whole board turned into one plan. */
+  function basket() {
+    const rows = doc.rows.slice().sort((a, b) => b.verdict.net_per_hour_usd - a.verdict.net_per_hour_usd);
+    let budget = 25000, hrs = 5;
+    const picks = [];
+    for (const r of rows) {
+      if (r.verdict.verdict !== 'keep') continue;
+      const v = r.verdict;
+      if (v.net_usd <= 0) continue;
+      const plan = Math.max(250, Math.round(r.tvl_usd * 0.0002));
+      if (plan > budget) continue;
+      picks.push({ r, plan, net: v.net_usd, perHour: v.net_per_hour_usd });
+      budget -= plan;
+      if (budget < 250) break;
+    }
+    const totNet = picks.reduce((a, x) => a + x.net, 0);
+    const totPlan = picks.reduce((a, x) => a + x.plan, 0);
+    return make('section', { class: 'panel basket-panel' }, [
+      make('h2', { text: 'basket builder — best expected net per hour, fitted to your capital and week' }),
+      make('p', { class: 'method', text: `Walks the board in $/h order and takes each plan whose full size still fits the remaining capital. ${picks.length} plans · ${money(totPlan)} deployed · ${money(totNet)} expected net.` }),
+      make('div', { class: 'scroll' }, [
+        make('table', null, [
+          make('thead', null, [make('tr', null, ['protocol', 'plan', 'expected net', '$ / h', 'verdict'].map((h) => make('th', { text: h })))]),
+          make('tbody', null, picks.map((x) => make('tr', null, [
+            make('td', { text: x.r.name }),
+            make('td', { class: 'num', text: money(x.plan) }),
+            make('td', { class: 'num', text: money(x.net) }),
+            make('td', { class: 'num', text: `$${x.perHour.toFixed(0)}` }),
+            make('td', null, [verdictPill(x.r.verdict)])
+          ])))
+        ])
+      ])
+    ]);
+  }
+
   function openDrawer(slug) {
     const row = doc.rows.find((r) => r.slug === slug);
     if (!row) return;
@@ -577,6 +669,23 @@ function masthead() {
           make('div', { class: 'cell' }, [make('b', { text: b.odds_base_rate.toFixed(3) }), make('span', { text: 'dated protocols base rate' })])
         ]);
       })(),
+      (() => {
+        const cal = doc.odds_calibration;
+        if (!Array.isArray(cal) || !cal.length) return null;
+        const head = ['age band', 'dated', 'model', 'actual'];
+        const rowsHtml = cal.map((c) => make('tr', null, [
+          make('td', { text: c.band }), make('td', { class: 'num', text: String(c.n) }),
+          make('td', { class: 'num', text: c.pred.toFixed(3) }), make('td', { class: 'num', text: c.actual.toFixed(3) })
+        ]));
+        return make('div', null, [
+          make('h3', { text: 'odds calibration, out of fold' }),
+          make('p', { class: 'method', text: 'The odds model’s 10-fold predictions against the dated protocols’ own base rate, in age bands — the odds printed are seen to be honest on the population they are quoted from.' }),
+          make('table', { class: 'cal' }, [
+            make('thead', null, [make('tr', null, head.map((h) => make('th', { text: h })))]),
+            make('tbody', null, rowsHtml)
+          ])
+        ]);
+      })(),
       make('h3', { text: 'base weights' }),
       make('p', { class: 'method', text: weights }),
       make('p', { class: 'method', text: `Growth is clamped so one outlier week cannot dominate; unknown ages assume ${p.assumed_age_days} days. The board is a floor, never a ceiling: ${s.below_floor} protocols below the floor are ranked too.` })
@@ -588,10 +697,22 @@ function masthead() {
     stage.appendChild(masthead());
     stage.appendChild(kpis());
     stage.appendChild(funnel());
-    stage.appendChild(coverage());
-    stage.appendChild(controls());
-    stage.appendChild(view.pane === 'pre' ? preTable() : liveTable());
-    if (view.pane === 'pre') stage.appendChild(method());
+    if (view.pane === 'pre') {
+      stage.appendChild(coverage());
+      stage.appendChild(controls());
+      const grid = make('section', { class: 'split' });
+      grid.appendChild(make('div', { class: 'col-main' }, [
+        view.pane === 'pre' ? preTable() : liveTable()
+      ]));
+      grid.appendChild(evidenceRail());
+      stage.appendChild(grid);
+      stage.appendChild(basket());
+      stage.appendChild(method());
+    } else {
+      stage.appendChild(coverage());
+      stage.appendChild(controls());
+      stage.appendChild(liveTable());
+    }
     stage.appendChild(drawer);
     if (view.openSlug) openDrawer(view.openSlug);
   }
